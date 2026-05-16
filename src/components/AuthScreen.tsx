@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { ensureProfileFromAuth, upsertProfile } from '../data/profileDb'
+import { getAuthRedirectUrl } from '../lib/siteUrl'
 import { supabase } from '../lib/supabase'
 import type { SignupProfileInput } from '../types'
 import { errorToMessage } from '../utils'
@@ -13,6 +14,16 @@ type Props = {
 
 function normalizePhone(value: string): string {
   return value.replace(/\D/g, '')
+}
+
+function friendlyAuthError(err: unknown): string {
+  const msg = errorToMessage(err)
+  if (/security purposes/i.test(msg) || /only request this after/i.test(msg)) {
+    const match = msg.match(/(\d+)\s*seconds?/i)
+    const secs = match?.[1] ?? '60'
+    return `Too many sign-up attempts. Wait ${secs} seconds, then try again.`
+  }
+  return msg
 }
 
 function validateSignupProfile(input: SignupProfileInput): string | null {
@@ -81,10 +92,12 @@ export function AuthScreen({ onAuthenticated }: Props) {
           return
         }
 
+        const emailRedirectTo = getAuthRedirectUrl()
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: trimmedEmail,
           password,
           options: {
+            emailRedirectTo: emailRedirectTo || undefined,
             data: {
               first_name: profile.firstName,
               last_name: profile.lastName,
@@ -106,7 +119,7 @@ export function AuthScreen({ onAuthenticated }: Props) {
         }
       }
     } catch (err) {
-      setError(errorToMessage(err))
+      setError(friendlyAuthError(err))
     } finally {
       setLoading(false)
     }
