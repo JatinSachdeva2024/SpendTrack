@@ -7,7 +7,8 @@ import {
   type Category,
   type Spending,
 } from './types'
-import { runExpenseReveal } from './expenseReveal'
+import { initCurrency, renderCurrencySelect, setCurrency } from './currency'
+import { isLiteReveal, runExpenseReveal } from './expenseReveal'
 import { runWalletBillAnimation } from './walletBillAnimation'
 import { renderExpenseWidget } from './expenseWidget'
 import {
@@ -53,6 +54,7 @@ export function getAppView(): AppView {
 
 export async function mountSpendTrack(root: HTMLElement): Promise<void> {
   app = root as HTMLDivElement
+  initCurrency()
   dbWarning = await initStorage()
   spendings = getSpendings()
   render()
@@ -255,6 +257,7 @@ function render(): void {
             <path fill="currentColor" d="M8.5 10.5a1.5 1.5 0 0 1 3 0v3a1.5 1.5 0 0 1-3 0v-3zm4.5-1.8a4.3 4.3 0 0 1 0 8.6v-1.2a3.1 3.1 0 0 0 0-6.2v-1.2zm4.5-1.8a7 7 0 0 1 0 14v-1.2a5.8 5.8 0 0 0 0-11.6V7z"/>
           </svg>
           <span class="spend-card__brand">SpendTrack</span>
+          ${renderCurrencySelect()}
           <div class="spend-card__body total-widget-content">
             <p id="total-label" class="total-label spend-card__label">${
               isLastMonthView ? 'Total last month' : 'Total this month'
@@ -302,13 +305,19 @@ function render(): void {
     const id = revealExpenseId
     revealExpenseId = null
     window.setTimeout(() => {
-      void runWalletBillAnimation()
+      if (!isLiteReveal()) void runWalletBillAnimation()
       runExpenseReveal(id)
-    }, 380)
+    }, isLiteReveal() ? 280 : 380)
   }
 }
 
 function bindEvents(): void {
+  document.getElementById('currency-select')?.addEventListener('change', (e) => {
+    const code = (e.target as HTMLSelectElement).value
+    setCurrency(code)
+    render()
+  })
+
   document.getElementById('fab-add')?.addEventListener('click', () => {
     sheetOpen = true
     render()

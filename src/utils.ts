@@ -1,11 +1,14 @@
+import { getCurrency } from './currency'
 import type { Spending } from './types'
 
-
 export function formatMoney(amount: number): string {
+  const currency = getCurrency()
+  const noDecimals = currency === 'JPY' || currency === 'KRW'
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
+    currency,
+    maximumFractionDigits: noDecimals ? 0 : 0,
+    minimumFractionDigits: noDecimals ? 0 : 0,
   }).format(amount)
 }
 
