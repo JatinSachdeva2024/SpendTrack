@@ -76,6 +76,11 @@ export function resetStorage(): void {
   ready = false
 }
 
+export async function refreshSpendingsCache(): Promise<Spending[]> {
+  cache = await fetchSpendings()
+  return cache
+}
+
 export async function addSpending(item: Spending): Promise<Spending[]> {
   const saved = await insertSpending(item)
   cache = [saved, ...cache.filter((s) => s.id !== saved.id)]

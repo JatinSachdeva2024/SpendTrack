@@ -3,6 +3,7 @@ import {
   IconCalendarMonth,
   IconChartBar,
   IconLogout,
+  IconRepeat,
   IconUser,
 } from '@tabler/icons-react'
 import { motion } from 'framer-motion'
@@ -17,6 +18,7 @@ import {
 import type { Profile } from '../types'
 import { errorToMessage } from '../utils'
 import { ProfileView } from './ProfileView'
+import { RecurringView } from './RecurringView'
 import {
   DesktopSidebar,
   MobileSidebar,
@@ -122,6 +124,14 @@ function SidebarNav({
             }}
           />
           <SidebarLink
+            active={view === 'recurring'}
+            onClick={() => onNavigate('recurring')}
+            link={{
+              label: 'Recurring',
+              icon: <IconRepeat className={iconClass} />,
+            }}
+          />
+          <SidebarLink
             active={view === 'profile'}
             onClick={() => onNavigate('profile')}
             link={{
@@ -156,7 +166,7 @@ export function SpendTrackShell({ appLoading, setAppLoading }: Props) {
   }, [])
 
   useLayoutEffect(() => {
-    if (view === 'profile') {
+    if (view === 'profile' || view === 'recurring') {
       unmountSpendTrack()
       setAppLoading(false)
       return
@@ -189,7 +199,7 @@ export function SpendTrackShell({ appLoading, setAppLoading }: Props) {
   function handleNavigate(next: AppView) {
     setView(next)
     setOpen(false)
-    if (next !== 'profile') {
+    if (next !== 'profile' && next !== 'recurring') {
       setAppView(next)
     }
   }
@@ -225,7 +235,7 @@ export function SpendTrackShell({ appLoading, setAppLoading }: Props) {
           </MobileSidebar>
 
           <main className="app-shell-main relative flex min-w-0 flex-1 flex-col pt-[max(3.25rem,env(safe-area-inset-top))] md:pt-0">
-            {appLoading && view !== 'profile' ? (
+            {appLoading && view !== 'profile' && view !== 'recurring' ? (
               <div className="app-loading" aria-live="polite">
                 Loading your data…
               </div>
@@ -233,6 +243,8 @@ export function SpendTrackShell({ appLoading, setAppLoading }: Props) {
 
             {view === 'profile' ? (
               <ProfileView />
+            ) : view === 'recurring' ? (
+              <RecurringView />
             ) : (
               <div
                 ref={appRef}

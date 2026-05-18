@@ -9,6 +9,7 @@ type SpendingRow = {
   note: string
   date: string
   created_at: string
+  recurring_id: string | null
 }
 
 function rowToSpending(row: SpendingRow): Spending {
@@ -19,13 +20,14 @@ function rowToSpending(row: SpendingRow): Spending {
     note: row.note ?? '',
     date: row.date,
     createdAt: new Date(row.created_at).getTime(),
+    recurringId: row.recurring_id ?? undefined,
   }
 }
 
 export async function fetchSpendings(): Promise<Spending[]> {
   const { data, error } = await supabase
     .from('spendings')
-    .select('id, user_id, amount, category, note, date, created_at')
+    .select('id, user_id, amount, category, note, date, created_at, recurring_id')
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -47,8 +49,9 @@ export async function insertSpending(item: Spending): Promise<Spending> {
       category: item.category,
       note: item.note,
       date: item.date,
+      recurring_id: item.recurringId ?? null,
     })
-    .select('id, user_id, amount, category, note, date, created_at')
+    .select('id, user_id, amount, category, note, date, created_at, recurring_id')
     .single()
 
   if (error) throw error

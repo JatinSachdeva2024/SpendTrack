@@ -14,6 +14,16 @@ export interface Spending {
   note: string
   date: string // YYYY-MM-DD
   createdAt?: number // ms — used for newest-first widget order
+  recurringId?: string
+}
+
+export interface RecurringExpense {
+  id: string
+  amount: number
+  category: Category
+  note: string
+  active: boolean
+  createdAt?: number
 }
 
 export interface Profile {

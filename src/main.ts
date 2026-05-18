@@ -18,6 +18,14 @@ import {
   removeSpending,
 } from './storage'
 import {
+  getPendingRecurring,
+  dismissRecurringReminder,
+  shouldShowRecurringBanner,
+  runRecurringReminderCheck,
+  currentMonthFirstDay,
+} from './recurringReminder'
+import { initRecurringStorage, resetRecurringStorage } from './recurringStorage'
+import {
   compareMonths,
   currentMonthKey,
   filterByMonth,
@@ -41,7 +49,7 @@ let expandedExpenseId: string | null = null
 let app: HTMLDivElement | null = null
 let appClickBound = false
 
-export type AppView = 'dashboard' | 'lastMonth' | 'profile'
+export type AppView = 'dashboard' | 'lastMonth' | 'recurring' | 'profile'
 
 export function setAppView(view: AppView): void {
   appView = view
@@ -57,7 +65,41 @@ export async function mountSpendTrack(root: HTMLElement): Promise<void> {
   initCurrency()
   dbWarning = await initStorage()
   spendings = getSpendings()
+  try {
+    await initRecurringStorage()
+  } catch (err) {
+    console.error('initRecurringStorage failed:', err)
+  }
+  runRecurringReminderCheck(spendings)
   render()
+}
+
+export function rerenderDashboard(): void {
+  if (app) render()
+}
+
+export async function applyPendingRecurringExpenses(): Promise<void> {
+  const pending = getPendingRecurring(spendings)
+  const date = currentMonthFirstDay()
+  for (const r of pending) {
+    const item: Spending = {
+      id: crypto.randomUUID(),
+      amount: r.amount,
+      category: r.category,
+      note: r.note,
+      date,
+      recurringId: r.id,
+      createdAt: Date.now(),
+    }
+    spendings = await addSpending(item)
+  }
+  if (pending.length > 0) {
+    dismissRecurringReminder()
+    if (app) {
+      revealExpenseId = spendings[0]?.id ?? null
+      render()
+    }
+  }
 }
 
 export function unmountSpendTrack(): void {
@@ -69,6 +111,7 @@ export function unmountSpendTrack(): void {
   revealExpenseId = null
   expandedExpenseId = null
   appClickBound = false
+  resetRecurringStorage()
 }
 
 function renderWeeklyChart(weeks: { week: number; total: number; label: string }[]): string {
@@ -189,6 +232,33 @@ function escapeHtml(text: string): string {
   return div.innerHTML
 }
 
+function renderRecurringBanner(): string {
+  if (appView !== 'dashboard' || !shouldShowRecurringBanner(spendings)) return ''
+
+  const pending = getPendingRecurring(spendings)
+  const label = monthLabel(currentMonthKey())
+  const items = pending
+    .map((r) => {
+      const cat = CATEGORIES.find((c) => c.id === r.category)
+      const name = r.note?.trim() || cat?.label || r.category
+      return `<li class="recurring-banner__item"><span>${escapeHtml(name)}</span><strong>${formatMoney(r.amount)}</strong></li>`
+    })
+    .join('')
+
+  return `
+    <div class="recurring-banner" role="region" aria-label="Recurring expenses due">
+      <div class="recurring-banner__inner">
+        <p class="recurring-banner__title">Recurring due — ${escapeHtml(label)}</p>
+        <p class="recurring-banner__hint">These repeat on the 1st of each month.</p>
+        <ul class="recurring-banner__list">${items}</ul>
+        <div class="recurring-banner__actions">
+          <button type="button" class="btn btn--filled btn--sm" data-add-all-recurring>Add all (${pending.length})</button>
+          <button type="button" class="btn btn--text btn--sm" data-dismiss-recurring>Dismiss</button>
+        </div>
+      </div>
+    </div>`
+}
+
 function render(): void {
   if (!app) return
 
@@ -211,6 +281,7 @@ function render(): void {
             )}</p></div>`
           : ''
       }
+      ${renderRecurringBanner()}
       <header class="app-header">
         <div class="logo-widget">
           <div
@@ -312,6 +383,18 @@ function render(): void {
 }
 
 function bindEvents(): void {
+  document.querySelector('[data-add-all-recurring]')?.addEventListener('click', () => {
+    void applyPendingRecurringExpenses().catch((err) => {
+      console.error(err)
+      alert(errorToMessage(err, 'Could not add recurring expenses.'))
+    })
+  })
+
+  document.querySelector('[data-dismiss-recurring]')?.addEventListener('click', () => {
+    dismissRecurringReminder()
+    render()
+  })
+
   document.getElementById('currency-select')?.addEventListener('change', (e) => {
     const code = (e.target as HTMLSelectElement).value
     setCurrency(code)
